@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ICP TX Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --primary: #3b82f6;
+      --primary-light: #60a5fa;
+      --bg: #f1f4f9;
+      --card: #ffffff;
+      --text: #475569;
+      --muted: #94a3b8;
+      --dark: #1e293b;
+      --radius: 20px;
+      --shadow: 0 2px 8px rgba(0,0,0,0.05);
+      --shadow-hover: 0 12px 28px rgba(59,130,246,0.13);
+      --green: #10b981;
+      --red: #ef4444;
+      --orange: #f59e0b;
+      --purple: #8b5cf6;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: Inter, system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 2rem;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container { max-width: 1400px; margin: 0 auto; }
+
+    /* Header */
+    .header {
+      display: flex; align-items: center; gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .logo {
+      width: 48px; height: 48px; border-radius: 50%;
+      background: var(--card); border: 2px solid #fff;
+      box-shadow: var(--shadow);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem; text-decoration: none;
+      transition: transform 0.3s;
+    }
+    .logo:hover { transform: scale(1.1) rotate(8deg); }
+    .header-title {
+      font-size: 1.7rem; font-weight: 800; letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #0f172a, #334155);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .header-sub { font-size: 0.82rem; color: var(--muted); margin-top: 2px; }
+
+    /* Loading */
+    #loading {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 1rem; padding: 4rem 0;
+    }
+    .spinner {
+      width: 40px; height: 40px; border: 3px solid #e2e8f0;
+      border-top-color: var(--primary); border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { color: var(--muted); font-size: 0.9rem; font-weight: 500; }
+    .loading-bar-wrap { width: 200px; height: 4px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+    .loading-bar { height: 100%; background: var(--primary); border-radius: 4px; width: 0; transition: width 0.3s; }
+
+    /* Stats grid */
+    .stats-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 1rem; margin-bottom: 1.5rem;
+    }
+    .stat-card {
+      background: var(--card); border-radius: var(--radius);
+      padding: 1.4rem 1.6rem;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(226,232,240,0.8);
+      animation: fadeUp 0.5s ease forwards; opacity: 0;
+    }
+    .stat-card:nth-child(1) { animation-delay: 0.05s; }
+    .stat-card:nth-child(2) { animation-delay: 0.1s; }
+    .stat-card:nth-child(3) { animation-delay: 0.15s; }
+    .stat-card:nth-child(4) { animation-delay: 0.2s; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .stat-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+    .stat-value { font-size: 1.9rem; font-weight: 800; color: var(--dark); margin-top: 0.3rem; letter-spacing: -0.02em; }
+    .stat-sub { font-size: 0.78rem; color: var(--muted); margin-top: 0.25rem; }
+
+    /* Charts row */
+    .charts-row {
+      display: grid; grid-template-columns: 2fr 1fr;
+      gap: 1rem; margin-bottom: 1.5rem;
+    }
+    .chart-card {
+      background: var(--card); border-radius: var(--radius);
+      padding: 1.6rem;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(226,232,240,0.8);
+      animation: fadeUp 0.5s 0.25s ease forwards; opacity: 0;
+    }
+    .chart-title {
+      font-size: 0.85rem; font-weight: 700; color: var(--dark);
+      margin-bottom: 1.2rem;
+    }
+    .chart-wrap { position: relative; height: 220px; }
+
+    /* Address breakdown */
+    .addr-grid {
+      display: grid; grid-template-columns: repeat(5, 1fr);
+      gap: 0.8rem; margin-bottom: 1.5rem;
+    }
+    .addr-card {
+      background: var(--card); border-radius: 16px;
+      padding: 1rem 1.1rem;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(226,232,240,0.8);
+      cursor: pointer;
+      transition: all 0.25s ease;
+      animation: fadeUp 0.5s ease forwards; opacity: 0;
+    }
+    .addr-card:hover, .addr-card.active {
+      border-color: var(--primary);
+      box-shadow: var(--shadow-hover);
+      transform: translateY(-3px);
+    }
+    .addr-card.active { background: #eff6ff; }
+    .addr-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      display: inline-block; margin-right: 0.4rem;
+    }
+    .addr-short { font-size: 0.78rem; font-weight: 700; color: var(--dark); font-family: ui-monospace, monospace; }
+    .addr-txn { font-size: 1.3rem; font-weight: 800; color: var(--dark); margin: 0.3rem 0 0.1rem; }
+    .addr-vol { font-size: 0.75rem; color: var(--muted); }
+
+    /* Filters */
+    .filters {
+      display: flex; gap: 0.6rem; flex-wrap: wrap;
+      margin-bottom: 1.2rem; align-items: center;
+    }
+    .filter-btn {
+      padding: 0.5rem 1.1rem;
+      border-radius: 12px; border: none; cursor: pointer;
+      font-size: 0.8rem; font-weight: 600;
+      background: var(--card); color: var(--text);
+      box-shadow: var(--shadow);
+      transition: all 0.2s;
+    }
+    .filter-btn.active {
+      background: var(--primary); color: #fff;
+      box-shadow: 0 4px 14px rgba(59,130,246,0.3);
+    }
+    .filter-sep { width: 1px; height: 24px; background: #e2e8f0; margin: 0 0.2rem; }
+    .search-box {
+      padding: 0.5rem 1rem;
+      border-radius: 12px; border: 1px solid #e2e8f0;
+      background: var(--card); color: var(--dark);
+      font-size: 0.8rem; font-weight: 500;
+      box-shadow: var(--shadow); outline: none;
+      width: 180px;
+    }
+    .search-box:focus { border-color: var(--primary); }
+
+    /* Table */
+    .table-card {
+      background: var(--card); border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(226,232,240,0.8);
+      overflow: hidden;
+      animation: fadeUp 0.5s 0.3s ease forwards; opacity: 0;
+    }
+    .table-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 1.2rem 1.6rem;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .table-title { font-size: 0.85rem; font-weight: 700; color: var(--dark); }
+    .table-count { font-size: 0.78rem; color: var(--muted); }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    thead th {
+      text-align: left; padding: 0.7rem 1.2rem;
+      background: #f8fafc; color: var(--muted);
+      font-size: 0.72rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      white-space: nowrap; cursor: pointer; user-select: none;
+    }
+    thead th:hover { color: var(--primary); }
+    tbody tr { border-top: 1px solid #f1f5f9; transition: background 0.15s; }
+    tbody tr:hover { background: #f8fafc; }
+    tbody td { padding: 0.8rem 1.2rem; color: var(--dark); white-space: nowrap; }
+
+    .badge {
+      display: inline-flex; align-items: center;
+      padding: 0.22rem 0.65rem;
+      border-radius: 8px; font-size: 0.71rem; font-weight: 700;
+    }
+    .badge-swap { background: #eff6ff; color: var(--primary); }
+    .badge-add { background: #ecfdf5; color: var(--green); }
+    .badge-remove { background: #fff7ed; color: var(--orange); }
+    .badge-icpswap { background: #f5f3ff; color: var(--purple); }
+    .badge-kongswap { background: #fff1f2; color: var(--red); }
+
+    .addr-tag {
+      display: inline-block;
+      padding: 0.2rem 0.55rem;
+      border-radius: 7px;
+      font-size: 0.7rem; font-weight: 700;
+      font-family: ui-monospace, monospace;
+      color: #fff;
+    }
+
+    .val-usd { font-weight: 700; color: var(--dark); }
+    .val-usd-null { color: var(--muted); }
+
+    .pair-text { font-weight: 600; }
+    .time-text { color: var(--muted); font-size: 0.75rem; }
+
+    /* Pagination */
+    .pagination {
+      display: flex; justify-content: center; align-items: center;
+      gap: 0.5rem; padding: 1.2rem;
+      border-top: 1px solid #f1f5f9;
+    }
+    .page-btn {
+      width: 34px; height: 34px;
+      border-radius: 10px; border: none; cursor: pointer;
+      font-size: 0.82rem; font-weight: 600;
+      background: var(--bg); color: var(--text);
+      transition: all 0.2s;
+    }
+    .page-btn:hover, .page-btn.active {
+      background: var(--primary); color: #fff;
+    }
+    .page-info { font-size: 0.78rem; color: var(--muted); padding: 0 0.5rem; }
+
+    /* Error */
+    .error-box {
+      background: #fff1f2; border: 1px solid #fecdd3;
+      border-radius: 14px; padding: 1rem 1.4rem;
+      font-size: 0.85rem; color: #be123c; margin-bottom: 1rem;
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .charts-row { grid-template-columns: 1fr; }
+      .addr-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 640px) {
+      body { padding: 1rem; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .addr-grid { grid-template-columns: repeat(2, 1fr); }
+      .header-title { font-size: 1.3rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <a href="https://me.ysyms.host/" class="logo">ICP</a>
+    <div>
+      <div class="header-title">ICP TX Dashboard</div>
+      <div class="header-sub">ICPSwap + KongSwap &nbsp;|&nbsp; 5 Addresses &nbsp;|&nbsp; Last 180 days</div>
+    </div>
+  </div>
+
+  <div id="loading">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loading-text">Initializing...</div>
+    <div class="loading-bar-wrap"><div class="loading-bar" id="loading-bar"></div></div>
+  </div>
+
+  <div id="app" style="display:none">
+    <div id="errors"></div>
+
+    <div class="stats-grid" id="stats-grid"></div>
+
+    <div class="addr-grid" id="addr-grid"></div>
+
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="chart-title">Daily Volume (USD)</div>
+        <div class="chart-wrap"><canvas id="chart-volume"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Transaction Type Distribution</div>
+        <div class="chart-wrap"><canvas id="chart-type"></canvas></div>
+      </div>
+    </div>
+
+    <div class="filters" id="filters">
+      <button class="filter-btn active" data-group="dex" data-val="all">All DEX</button>
+      <button class="filter-btn" data-group="dex" data-val="ICPSwap">ICPSwap</button>
+      <button class="filter-btn" data-group="dex" data-val="KongSwap">KongSwap</button>
+      <div class="filter-sep"></div>
+      <button class="filter-btn active" data-group="type" data-val="all">All Types</button>
+      <button class="filter-btn" data-group="type" data-val="Swap">Swap</button>
+      <button class="filter-btn" data-group="type" data-val="Liquidity">Liquidity</button>
+      <div class="filter-sep"></div>
+      <input class="search-box" id="search-box" placeholder="Search token..." type="text">
+    </div>
+
+    <div class="table-card">
+      <div class="table-header">
+        <div class="table-title">Transactions</div>
+        <div class="table-count" id="table-count"></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th data-sort="time">Time</th>
+              <th>Address</th>
+              <th>DEX</th>
+              <th>Type</th>
+              <th>Pair / Action</th>
+              <th data-sort="valueUSD">Value (USD)</th>
+              <th>In</th>
+              <th>Out</th>
+            </tr>
+          </thead>
+          <tbody id="tx-tbody"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="pagination"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ADDRESSES = [
+  'jrnhz-6ekxv-2fffs-wfcgt-l3pe7-456id-heznf-xyf64-nykjq-4jyso-zae',
+  'ufkqe-udycd-ycehk-a2swd-t5ryr-qkruo-7dxkp-dlcpw-gs2ow-hj6lx-tqe',
+  'l6rkp-7uoxs-qd2gn-kuvox-q33xz-5rezd-ui6ry-2mtmm-dxmn6-qvk3c-jqe',
+  't42ib-xs24t-qn54t-ucg5o-a54ke-a636a-pwp34-xgllo-cshum-xummt-rqe',
+  'c2wkr-xnqao-gmktv-dxuvq-wjupk-543m4-kxiwh-erkba-bvx4w-jmqot-aae',
+];
+
+const ADDR_COLORS = ['#3b82f6','#10b981','#f59e0b','#8b5cf6','#ef4444'];
+const ADDR_SHORT = addr => addr.slice(0,8) + '...' + addr.slice(-4);
+
+let allTx = [];
+let filtered = [];
+let currentPage = 1;
+const PAGE_SIZE = 25;
+let sortKey = 'time';
+let sortDir = -1;
+let filterDex = 'all';
+let filterType = 'all';
+let filterSearch = '';
+let activeAddr = 'all';
+let kongTokenMap = {};
+let volumeChart = null, typeChart = null;
+
+// ── Helpers ──────────────────────────────────────────────
+const parseUnder = s => parseFloat(String(s).replace(/_/g, ''));
+const fmt = (n, d=2) => n == null ? '—' : Number(n).toLocaleString('en-US', {minimumFractionDigits:d, maximumFractionDigits:d});
+const fmtUSD = n => n == null ? null : '$' + fmt(n);
+const fmtTime = ts => {
+  const d = new Date(ts);
+  return d.toISOString().slice(0,16).replace('T',' ');
+};
+const setProgress = (pct, txt) => {
+  document.getElementById('loading-bar').style.width = pct + '%';
+  if(txt) document.getElementById('loading-text').textContent = txt;
+};
+
+// ── Fetch ─────────────────────────────────────────────────
+async function fetchKongTokens() {
+  try {
+    const r = await fetch('https://api.kongswap.io/api/tokens');
+    const j = await r.json();
+    j.items.forEach(t => { kongTokenMap[t.token_id] = t; });
+  } catch(e) { console.warn('Kong token list failed', e); }
+}
+
+async function fetchICPSwap(addr) {
+  const END = Date.now();
+  const BEGIN = END - 180*24*3600*1000;
+  const txs = [];
+  let page = 1;
+  const LIMIT = 200;
+  while(true) {
+    const r = await fetch(`https://api.icpswap.com/info/transaction/find?principal=${addr}&page=${page}&limit=${LIMIT}&begin=${BEGIN}&end=${END}`);
+    const j = await r.json();
+    if(!j.data || !j.data.content || j.data.content.length === 0) break;
+    txs.push(...j.data.content);
+    if(txs.length >= j.data.totalElements || txs.length >= 600) break;
+    page++;
+  }
+  return txs.map(t => ({
+    id: t.txHash,
+    address: addr,
+    dex: 'ICPSwap',
+    type: t.actionType === 'Swap' ? 'Swap' : (t.actionType.includes('Add') ? 'AddLiquidity' : 'RemoveLiquidity'),
+    time: t.txTime,
+    symbolIn: t.token0AmountIn > 0 ? t.token0Symbol : t.token1Symbol,
+    symbolOut: t.token0AmountOut > 0 ? t.token0Symbol : t.token1Symbol,
+    amountIn: t.token0AmountIn > 0 ? parseFloat(t.token0AmountIn) : parseFloat(t.token1AmountIn),
+    amountOut: t.token0AmountOut > 0 ? parseFloat(t.token0AmountOut) : parseFloat(t.token1AmountOut),
+    pair: `${t.token0Symbol}/${t.token1Symbol}`,
+    valueUSD: parseFloat(t.token0TxValue) || null,
+  }));
+}
+
+async function fetchKongSwap(addr) {
+  const [swapR, liqR] = await Promise.all([
+    fetch(`https://api.kongswap.io/api/users/${addr}/transactions/swap?limit=200`),
+    fetch(`https://api.kongswap.io/api/users/${addr}/transactions/liquidity?limit=200`),
+  ]);
+  const swapJ = await swapR.json();
+  const liqJ = await liqR.json();
+
+  const swapTxs = (swapJ.items || []).map(item => {
+    const tx = item.transaction;
+    const raw = tx.raw_json?.SwapTx;
+    if(!raw) return null;
+    const payId = raw.pay_token_id;
+    const recId = raw.receive_token_id;
+    const payTok = kongTokenMap[payId] || { symbol: `#${payId}`, decimals: 8 };
+    const recTok = kongTokenMap[recId] || { symbol: `#${recId}`, decimals: 8 };
+    const amtIn = parseUnder(raw.pay_amount) / Math.pow(10, payTok.decimals);
+    const amtOut = parseUnder(raw.receive_amount) / Math.pow(10, recTok.decimals);
+    const payPrice = payTok.metrics?.price;
+    const valueUSD = payPrice ? amtIn * payPrice : null;
+    return {
+      id: `kong-swap-${tx.tx_id}`,
+      address: addr,
+      dex: 'KongSwap',
+      type: 'Swap',
+      time: new Date(tx.ts + 'Z').getTime(),
+      symbolIn: payTok.symbol,
+      symbolOut: recTok.symbol,
+      amountIn: amtIn,
+      amountOut: amtOut,
+      pair: `${payTok.symbol}/${recTok.symbol}`,
+      valueUSD,
+    };
+  }).filter(Boolean);
+
+  const liqTxs = (liqJ.items || []).map(item => {
+    const tx = item.transaction;
+    const isAdd = tx.tx_type === 'AddLiquidity';
+    const raw = tx.raw_json?.AddLiquidityTx || tx.raw_json?.RemoveLiquidityTx;
+    if(!raw) return null;
+    return {
+      id: `kong-liq-${tx.tx_id}`,
+      address: addr,
+      dex: 'KongSwap',
+      type: isAdd ? 'AddLiquidity' : 'RemoveLiquidity',
+      time: new Date(tx.ts + 'Z').getTime(),
+      symbolIn: '—',
+      symbolOut: '—',
+      amountIn: null,
+      amountOut: null,
+      pair: `Pool #${raw.pool_id ?? '?'}`,
+      valueUSD: null,
+    };
+  }).filter(Boolean);
+
+  return [...swapTxs, ...liqTxs];
+}
+
+// ── Render ────────────────────────────────────────────────
+function renderStats() {
+  const totalTxn = allTx.length;
+  const totalVol = allTx.reduce((s,t) => s + (t.valueUSD||0), 0);
+  const swapCount = allTx.filter(t=>t.type==='Swap').length;
+  const dexSet = [...new Set(allTx.map(t=>t.dex))].join(' + ');
+
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">Total Transactions</div>
+      <div class="stat-value">${totalTxn.toLocaleString()}</div>
+      <div class="stat-sub">${dexSet}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Volume (USD)</div>
+      <div class="stat-value">$${fmt(totalVol,0)}</div>
+      <div class="stat-sub">Last 180 days</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Swap Transactions</div>
+      <div class="stat-value">${swapCount.toLocaleString()}</div>
+      <div class="stat-sub">${fmt(swapCount/totalTxn*100,1)}% of total</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Active Addresses</div>
+      <div class="stat-value">${ADDRESSES.length}</div>
+      <div class="stat-sub">${[...new Set(allTx.map(t=>t.dex))].length} DEXes</div>
+    </div>
+  `;
+}
+
+function renderAddrCards() {
+  const grid = document.getElementById('addr-grid');
+  grid.innerHTML = ADDRESSES.map((addr, i) => {
+    const txns = allTx.filter(t=>t.address===addr);
+    const vol = txns.reduce((s,t)=>s+(t.valueUSD||0),0);
+    const delay = 0.05 + i*0.05;
+    return `
+      <div class="addr-card ${activeAddr===addr?'active':''}" data-addr="${addr}"
+           style="animation-delay:${delay}s" onclick="setAddr('${addr}')">
+        <div><span class="addr-dot" style="background:${ADDR_COLORS[i]}"></span>
+             <span class="addr-short">${ADDR_SHORT(addr)}</span></div>
+        <div class="addr-txn">${txns.length.toLocaleString()}</div>
+        <div class="addr-vol">$${fmt(vol,0)} vol</div>
+      </div>
+    `;
+  }).join('') + `
+    <div class="addr-card ${activeAddr==='all'?'active':''}" data-addr="all"
+         style="animation-delay:0.3s" onclick="setAddr('all')">
+      <div><span class="addr-dot" style="background:#94a3b8"></span>
+           <span class="addr-short">All Addresses</span></div>
+      <div class="addr-txn">${allTx.length.toLocaleString()}</div>
+      <div class="addr-vol">combined</div>
+    </div>
+  `;
+}
+
+function renderCharts() {
+  // Volume chart – daily
+  const days = {};
+  filtered.forEach(t => {
+    const day = new Date(t.time).toISOString().slice(0,10);
+    days[day] = (days[day]||0) + (t.valueUSD||0);
+  });
+  const sortedDays = Object.keys(days).sort();
+  const labels = sortedDays.slice(-60);
+  const data = labels.map(d=>days[d]||0);
+
+  if(volumeChart) volumeChart.destroy();
+  volumeChart = new Chart(document.getElementById('chart-volume'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: 'rgba(59,130,246,0.7)',
+        borderRadius: 4,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { label: ctx => '$' + fmt(ctx.raw, 0) }
+      }},
+      scales: {
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 8, font: { size: 10 } } },
+        y: { grid: { color: '#f1f5f9' }, ticks: {
+          callback: v => '$' + (v>=1000 ? fmt(v/1000,0)+'k' : fmt(v,0)),
+          font: { size: 10 }
+        }}
+      }
+    }
+  });
+
+  // Type pie
+  const types = {};
+  filtered.forEach(t => { types[t.type] = (types[t.type]||0)+1; });
+  if(typeChart) typeChart.destroy();
+  typeChart = new Chart(document.getElementById('chart-type'), {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(types),
+      datasets: [{
+        data: Object.values(types),
+        backgroundColor: ['#3b82f6','#10b981','#f59e0b','#8b5cf6'],
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 12 } }
+      },
+      cutout: '62%',
+    }
+  });
+}
+
+function applyFilters() {
+  let src = activeAddr === 'all' ? allTx : allTx.filter(t=>t.address===activeAddr);
+  if(filterDex !== 'all') src = src.filter(t=>t.dex===filterDex);
+  if(filterType === 'Swap') src = src.filter(t=>t.type==='Swap');
+  if(filterType === 'Liquidity') src = src.filter(t=>t.type!=='Swap');
+  if(filterSearch) {
+    const q = filterSearch.toLowerCase();
+    src = src.filter(t =>
+      t.pair.toLowerCase().includes(q) ||
+      t.symbolIn.toLowerCase().includes(q) ||
+      t.symbolOut.toLowerCase().includes(q) ||
+      t.dex.toLowerCase().includes(q)
+    );
+  }
+  src = src.sort((a,b) => {
+    const av = a[sortKey], bv = b[sortKey];
+    if(av==null) return 1; if(bv==null) return -1;
+    return (av<bv?-1:av>bv?1:0) * sortDir;
+  });
+  filtered = src;
+  currentPage = 1;
+  renderTable();
+  renderCharts();
+}
+
+function renderTable() {
+  const start = (currentPage-1)*PAGE_SIZE;
+  const page = filtered.slice(start, start+PAGE_SIZE);
+  document.getElementById('table-count').textContent = `${filtered.length.toLocaleString()} transactions`;
+
+  document.getElementById('tx-tbody').innerHTML = page.map(t => {
+    const addrIdx = ADDRESSES.indexOf(t.address);
+    const color = ADDR_COLORS[addrIdx] || '#94a3b8';
+    const typeBadge = t.type==='Swap' ? 'badge-swap' : t.type==='AddLiquidity' ? 'badge-add' : 'badge-remove';
+    const typeLabel = t.type==='AddLiquidity' ? 'Add Liq' : t.type==='RemoveLiquidity' ? 'Rem Liq' : 'Swap';
+    const dexBadge = t.dex==='ICPSwap' ? 'badge-icpswap' : 'badge-kongswap';
+    const usd = t.valueUSD != null ? `<span class="val-usd">${fmtUSD(t.valueUSD)}</span>` : `<span class="val-usd-null">—</span>`;
+    const amtIn = t.amountIn != null ? `${fmt(t.amountIn,4)} ${t.symbolIn}` : '—';
+    const amtOut = t.amountOut != null ? `${fmt(t.amountOut,4)} ${t.symbolOut}` : '—';
+    return `<tr>
+      <td><span class="time-text">${fmtTime(t.time)}</span></td>
+      <td><span class="addr-tag" style="background:${color}">${ADDR_SHORT(t.address)}</span></td>
+      <td><span class="badge ${dexBadge}">${t.dex}</span></td>
+      <td><span class="badge ${typeBadge}">${typeLabel}</span></td>
+      <td><span class="pair-text">${t.pair}</span></td>
+      <td>${usd}</td>
+      <td style="color:var(--muted);font-size:0.78rem">${amtIn}</td>
+      <td style="color:var(--muted);font-size:0.78rem">${amtOut}</td>
+    </tr>`;
+  }).join('');
+
+  renderPagination();
+}
+
+function renderPagination() {
+  const total = Math.ceil(filtered.length / PAGE_SIZE);
+  if(total <= 1) { document.getElementById('pagination').innerHTML=''; return; }
+  let pages = [];
+  if(total <= 7) {
+    for(let i=1;i<=total;i++) pages.push(i);
+  } else {
+    pages = [1,2];
+    if(currentPage>3) pages.push('...');
+    for(let i=Math.max(3,currentPage-1);i<=Math.min(total-2,currentPage+1);i++) pages.push(i);
+    if(currentPage<total-2) pages.push('...');
+    pages.push(total-1,total);
+    pages = [...new Set(pages)];
+  }
+  document.getElementById('pagination').innerHTML = [
+    `<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>`,
+    ...pages.map(p => p==='...'
+      ? `<span class="page-info">…</span>`
+      : `<button class="page-btn ${p===currentPage?'active':''}" onclick="goPage(${p})">${p}</button>`
+    ),
+    `<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage===total?'disabled':''}>›</button>`,
+    `<span class="page-info">${currentPage}/${total}</span>`,
+  ].join('');
+}
+
+function goPage(p) {
+  const total = Math.ceil(filtered.length/PAGE_SIZE);
+  if(p<1||p>total) return;
+  currentPage=p; renderTable();
+  document.querySelector('.table-card').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function setAddr(addr) {
+  activeAddr = addr;
+  document.querySelectorAll('.addr-card').forEach(el => {
+    el.classList.toggle('active', el.dataset.addr===addr);
+  });
+  applyFilters();
+}
+
+// ── Init ──────────────────────────────────────────────────
+document.getElementById('filters').addEventListener('click', e => {
+  const btn = e.target.closest('.filter-btn');
+  if(!btn) return;
+  const {group, val} = btn.dataset;
+  document.querySelectorAll(`.filter-btn[data-group="${group}"]`).forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if(group==='dex') filterDex=val;
+  if(group==='type') filterType=val;
+  applyFilters();
+});
+
+document.getElementById('search-box').addEventListener('input', e => {
+  filterSearch = e.target.value.trim();
+  applyFilters();
+});
+
+document.querySelectorAll('thead th[data-sort]').forEach(th => {
+  th.addEventListener('click', () => {
+    if(sortKey===th.dataset.sort) sortDir*=-1;
+    else { sortKey=th.dataset.sort; sortDir=-1; }
+    applyFilters();
+  });
+});
+
+async function main() {
+  setProgress(5, 'Loading token list...');
+  await fetchKongTokens();
+  setProgress(15, 'Fetching transactions...');
+
+  const results = [];
+  const errors = [];
+  const step = 80 / (ADDRESSES.length * 2);
+  let done = 0;
+
+  await Promise.all(ADDRESSES.map(async addr => {
+    const shortAddr = ADDR_SHORT(addr);
+    try {
+      const icp = await fetchICPSwap(addr);
+      results.push(...icp);
+    } catch(e) { errors.push(`ICPSwap/${shortAddr}: ${e.message}`); }
+    done++; setProgress(15 + done*step, `Fetching ${shortAddr}...`);
+
+    try {
+      const kong = await fetchKongSwap(addr);
+      results.push(...kong);
+    } catch(e) { errors.push(`KongSwap/${shortAddr}: ${e.message}`); }
+    done++; setProgress(15 + done*step, `Fetching ${shortAddr}...`);
+  }));
+
+  setProgress(100, 'Rendering...');
+
+  if(errors.length) {
+    document.getElementById('errors').innerHTML = errors.map(e=>
+      `<div class="error-box">${e}</div>`
+    ).join('');
+  }
+
+  allTx = results.sort((a,b)=>b.time-a.time);
+  filtered = [...allTx];
+
+  document.getElementById('loading').style.display='none';
+  document.getElementById('app').style.display='block';
+
+  renderStats();
+  renderAddrCards();
+  applyFilters();
+}
+
+main();
+</script>
+</body>
+</html>
