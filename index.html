@@ -237,7 +237,10 @@
       font-size: 0.7rem; font-weight: 700;
       font-family: ui-monospace, monospace;
       color: #fff;
+      text-decoration: none;
+      transition: opacity 0.15s;
     }
+    .addr-tag:hover { opacity: 0.82; }
 
     .val-usd { font-weight: 700; color: var(--dark); }
     .val-usd-null { color: var(--muted); }
@@ -692,7 +695,7 @@ function renderTable() {
     const amtOut = t.amountOut != null ? `${fmt(t.amountOut,4)} ${t.symbolOut}` : '—';
     return `<tr>
       <td><span class="time-text">${fmtTime(t.time)}</span></td>
-      <td><span class="addr-tag" style="background:${color}">${ADDR_SHORT(t.address)}</span></td>
+      <td><a class="addr-tag" style="background:${color}" href="https://t5t44-naaaa-aaaah-qcutq-cai.raw.ic0.app/holder/${t.address}/summary" target="_blank" rel="noopener">${ADDR_SHORT(t.address)}</a></td>
       <td><span class="badge ${dexBadge}">${t.dex}</span></td>
       <td><span class="badge ${typeBadge}">${typeLabel}</span></td>
       <td><span class="pair-text">${t.pair}</span></td>
