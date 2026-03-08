@@ -357,6 +357,7 @@ let filterType = 'all';
 let filterSearch = '';
 let activeAddr = 'all';
 let kongTokenMap = {};
+let kongPoolMap = {};
 let volumeChart = null, typeChart = null;
 
 // ── Helpers ──────────────────────────────────────────────
@@ -375,10 +376,21 @@ const setProgress = (pct, txt) => {
 // ── Fetch ─────────────────────────────────────────────────
 async function fetchKongTokens() {
   try {
-    const r = await fetch('https://api.kongswap.io/api/tokens');
-    const j = await r.json();
-    j.items.forEach(t => { kongTokenMap[t.token_id] = t; });
-  } catch(e) { console.warn('Kong token list failed', e); }
+    const [tokR, poolR] = await Promise.all([
+      fetch('https://api.kongswap.io/api/tokens'),
+      fetch('https://api.kongswap.io/api/pools'),
+    ]);
+    const tokJ = await tokR.json();
+    tokJ.items.forEach(t => { kongTokenMap[t.token_id] = t; });
+    const poolJ = await poolR.json();
+    (poolJ.items || []).forEach(p => {
+      kongPoolMap[p.pool.pool_id] = {
+        symbol0: p.token0.symbol, decimals0: p.token0.decimals,
+        symbol1: p.token1.symbol, decimals1: p.token1.decimals,
+        price0: p.token0.metrics?.price, price1: p.token1.metrics?.price,
+      };
+    });
+  } catch(e) { console.warn('Kong meta failed', e); }
 }
 
 async function fetchICPSwap(addr) {
@@ -451,18 +463,23 @@ async function fetchKongSwap(addr) {
     const isAdd = tx.tx_type === 'AddLiquidity';
     const raw = tx.raw_json?.AddLiquidityTx || tx.raw_json?.RemoveLiquidityTx;
     if(!raw) return null;
+    const pool = kongPoolMap[raw.pool_id];
+    const amt0 = raw.amount_0 != null ? parseUnder(raw.amount_0) / Math.pow(10, pool?.decimals0 ?? 8) : null;
+    const amt1 = raw.amount_1 != null ? parseUnder(raw.amount_1) / Math.pow(10, pool?.decimals1 ?? 8) : null;
+    const valueUSD = (pool && amt0 != null && pool.price0) ? amt0 * pool.price0 * 2
+                   : (pool && amt1 != null && pool.price1) ? amt1 * pool.price1 * 2 : null;
     return {
       id: `kong-liq-${tx.tx_id}`,
       address: addr,
       dex: 'KongSwap',
       type: isAdd ? 'AddLiquidity' : 'RemoveLiquidity',
       time: new Date(tx.ts + 'Z').getTime(),
-      symbolIn: '—',
-      symbolOut: '—',
-      amountIn: null,
-      amountOut: null,
-      pair: `Pool #${raw.pool_id ?? '?'}`,
-      valueUSD: null,
+      symbolIn: pool ? pool.symbol0 : '?',
+      symbolOut: pool ? pool.symbol1 : '?',
+      amountIn: amt0,
+      amountOut: amt1,
+      pair: pool ? `${pool.symbol0}/${pool.symbol1}` : `Pool #${raw.pool_id ?? '?'}`,
+      valueUSD,
     };
   }).filter(Boolean);
 
