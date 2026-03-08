@@ -387,7 +387,7 @@ async function fetchKongTokens() {
       kongPoolMap[p.pool.pool_id] = {
         symbol0: p.token0.symbol, decimals0: p.token0.decimals,
         symbol1: p.token1.symbol, decimals1: p.token1.decimals,
-        price0: p.token0.metrics?.price, price1: p.token1.metrics?.price,
+        tokenId0: p.pool.token_id_0, tokenId1: p.pool.token_id_1,
       };
     });
   } catch(e) { console.warn('Kong meta failed', e); }
@@ -466,8 +466,10 @@ async function fetchKongSwap(addr) {
     const pool = kongPoolMap[raw.pool_id];
     const amt0 = raw.amount_0 != null ? parseUnder(raw.amount_0) / Math.pow(10, pool?.decimals0 ?? 8) : null;
     const amt1 = raw.amount_1 != null ? parseUnder(raw.amount_1) / Math.pow(10, pool?.decimals1 ?? 8) : null;
-    const valueUSD = (pool && amt0 != null && pool.price0) ? amt0 * pool.price0 * 2
-                   : (pool && amt1 != null && pool.price1) ? amt1 * pool.price1 * 2 : null;
+    const price0 = pool ? kongTokenMap[pool.tokenId0]?.metrics?.price : null;
+    const price1 = pool ? kongTokenMap[pool.tokenId1]?.metrics?.price : null;
+    const valueUSD = (price0 && amt0 != null) ? amt0 * price0 * 2
+                   : (price1 && amt1 != null) ? amt1 * price1 * 2 : null;
     return {
       id: `kong-liq-${tx.tx_id}`,
       address: addr,
