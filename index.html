@@ -742,6 +742,8 @@ function setAddr(addr) {
   document.querySelectorAll('.addr-card').forEach(el => {
     el.classList.toggle('active', el.dataset.addr===addr);
   });
+  const bar = document.querySelector('.addr-all-bar');
+  if(bar) bar.classList.toggle('active', addr==='all');
   applyFilters();
 }
 
