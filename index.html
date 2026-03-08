@@ -415,8 +415,9 @@ async function fetchKongSwap(addr) {
     fetch(`https://api.kongswap.io/api/users/${addr}/transactions/swap?limit=200`),
     fetch(`https://api.kongswap.io/api/users/${addr}/transactions/liquidity?limit=200`),
   ]);
-  const swapJ = await swapR.json();
-  const liqJ = await liqR.json();
+  const safeJson = async r => { try { return await r.json(); } catch { return { items: [] }; } };
+  const swapJ = await safeJson(swapR);
+  const liqJ = await safeJson(liqR);
 
   const swapTxs = (swapJ.items || []).map(item => {
     const tx = item.transaction;
