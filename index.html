@@ -112,9 +112,32 @@
     .chart-wrap { position: relative; height: 220px; }
 
     /* Address breakdown */
+    .addr-section { margin-bottom: 1.5rem; }
+    .addr-all-bar {
+      background: var(--card); border-radius: 16px;
+      padding: 0.85rem 1.4rem;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(226,232,240,0.8);
+      cursor: pointer;
+      transition: all 0.25s ease;
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 0.8rem;
+      animation: fadeUp 0.5s ease forwards; opacity: 0;
+    }
+    .addr-all-bar:hover, .addr-all-bar.active {
+      border-color: var(--primary);
+      box-shadow: var(--shadow-hover);
+    }
+    .addr-all-bar.active { background: #eff6ff; }
+    .addr-all-left { display: flex; align-items: center; gap: 0.6rem; }
+    .addr-all-label { font-size: 0.82rem; font-weight: 700; color: var(--dark); }
+    .addr-all-right { display: flex; align-items: center; gap: 2rem; }
+    .addr-all-stat { text-align: right; }
+    .addr-all-stat-val { font-size: 1rem; font-weight: 800; color: var(--dark); }
+    .addr-all-stat-label { font-size: 0.7rem; color: var(--muted); margin-top: 1px; }
     .addr-grid {
       display: grid; grid-template-columns: repeat(5, 1fr);
-      gap: 0.8rem; margin-bottom: 1.5rem;
+      gap: 0.8rem;
     }
     .addr-card {
       background: var(--card); border-radius: 16px;
@@ -252,11 +275,13 @@
       .stats-grid { grid-template-columns: repeat(2, 1fr); }
       .charts-row { grid-template-columns: 1fr; }
       .addr-grid { grid-template-columns: repeat(3, 1fr); }
+      .addr-all-right { gap: 1rem; }
     }
     @media (max-width: 640px) {
       body { padding: 1rem; }
       .stats-grid { grid-template-columns: repeat(2, 1fr); }
       .addr-grid { grid-template-columns: repeat(2, 1fr); }
+      .addr-all-right { gap: 0.8rem; }
       .header-title { font-size: 1.3rem; }
     }
   </style>
@@ -282,7 +307,10 @@
 
     <div class="stats-grid" id="stats-grid"></div>
 
-    <div class="addr-grid" id="addr-grid"></div>
+    <div class="addr-section">
+      <div id="addr-all-bar"></div>
+      <div class="addr-grid" id="addr-grid"></div>
+    </div>
 
     <div class="charts-row">
       <div class="chart-card">
@@ -520,29 +548,45 @@ function renderStats() {
 }
 
 function renderAddrCards() {
+  const totalVol = allTx.reduce((s,t)=>s+(t.valueUSD||0),0);
+  const totalTxn = allTx.length;
+  document.getElementById('addr-all-bar').innerHTML = `
+    <div class="addr-all-bar ${activeAddr==='all'?'active':''}" onclick="setAddr('all')">
+      <div class="addr-all-left">
+        <span class="addr-dot" style="background:#94a3b8"></span>
+        <span class="addr-all-label">All Addresses</span>
+      </div>
+      <div class="addr-all-right">
+        <div class="addr-all-stat">
+          <div class="addr-all-stat-val">${totalTxn.toLocaleString()}</div>
+          <div class="addr-all-stat-label">transactions</div>
+        </div>
+        <div class="addr-all-stat">
+          <div class="addr-all-stat-val">$${fmt(totalVol,0)}</div>
+          <div class="addr-all-stat-label">total volume</div>
+        </div>
+        <div class="addr-all-stat">
+          <div class="addr-all-stat-val">${ADDRESSES.length}</div>
+          <div class="addr-all-stat-label">addresses</div>
+        </div>
+      </div>
+    </div>
+  `;
+
   const grid = document.getElementById('addr-grid');
   grid.innerHTML = ADDRESSES.map((addr, i) => {
     const txns = allTx.filter(t=>t.address===addr);
     const vol = txns.reduce((s,t)=>s+(t.valueUSD||0),0);
-    const delay = 0.05 + i*0.05;
     return `
       <div class="addr-card ${activeAddr===addr?'active':''}" data-addr="${addr}"
-           style="animation-delay:${delay}s" onclick="setAddr('${addr}')">
+           style="animation-delay:${0.05+i*0.05}s" onclick="setAddr('${addr}')">
         <div><span class="addr-dot" style="background:${ADDR_COLORS[i]}"></span>
              <span class="addr-short">${ADDR_SHORT(addr)}</span></div>
         <div class="addr-txn">${txns.length.toLocaleString()}</div>
         <div class="addr-vol">$${fmt(vol,0)} vol</div>
       </div>
     `;
-  }).join('') + `
-    <div class="addr-card ${activeAddr==='all'?'active':''}" data-addr="all"
-         style="animation-delay:0.3s" onclick="setAddr('all')">
-      <div><span class="addr-dot" style="background:#94a3b8"></span>
-           <span class="addr-short">All Addresses</span></div>
-      <div class="addr-txn">${allTx.length.toLocaleString()}</div>
-      <div class="addr-vol">combined</div>
-    </div>
-  `;
+  }).join('');
 }
 
 function renderCharts() {
