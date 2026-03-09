@@ -592,7 +592,7 @@ document.getElementById('btn-signup').onclick = async () => {
   if (!email || !password) return showMsg('Please fill in all fields.');
   const btn = document.getElementById('btn-signup');
   btn.disabled = true; btn.textContent = 'Creating account...';
-  const { error } = await sb.auth.signUp({ email, password });
+  const { error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
   btn.disabled = false; btn.textContent = 'Create Account';
   if (error) showMsg(error.message);
   else showMsg('Check your email to confirm your account.', 'success');
