@@ -545,6 +545,7 @@ const sb = createClient(
   'https://yaranvbhzahehepzbicy.supabase.co',
   'sb_publishable__DX0PmSICnl4pPtZLqgxxw_9lETEnZx'
 );
+const SITE_URL = 'https://tx.ysyms.host';
 
 // ── Auth UI ────────────────────────────────────────────────
 function showMsg(msg, type='error') {
@@ -570,7 +571,7 @@ document.getElementById('link-to-login2').onclick = () => showForm('login');
 document.getElementById('btn-google').onclick = async () => {
   const { error } = await sb.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: window.location.origin }
+    options: { redirectTo: SITE_URL }
   });
   if (error) showMsg(error.message);
 };
@@ -592,7 +593,7 @@ document.getElementById('btn-signup').onclick = async () => {
   if (!email || !password) return showMsg('Please fill in all fields.');
   const btn = document.getElementById('btn-signup');
   btn.disabled = true; btn.textContent = 'Creating account...';
-  const { error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
+  const { error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: SITE_URL } });
   btn.disabled = false; btn.textContent = 'Create Account';
   if (error) showMsg(error.message);
   else showMsg('Check your email to confirm your account.', 'success');
@@ -604,7 +605,7 @@ document.getElementById('btn-reset').onclick = async () => {
   const btn = document.getElementById('btn-reset');
   btn.disabled = true; btn.textContent = 'Sending...';
   const { error } = await sb.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin
+    redirectTo: SITE_URL
   });
   btn.disabled = false; btn.textContent = 'Send Reset Link';
   if (error) showMsg(error.message);
